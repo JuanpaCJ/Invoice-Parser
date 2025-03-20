@@ -80,6 +80,10 @@ optional arguments:
 
 ### Ejemplos de uso
 
+Instalar dependencias usando "pip install -r requirements.txt"
+
+Basta con ejecutar el archivo gui.py utilizando "python gui.py" desde consola una vez instaladas las dependencias
+
 #### Procesar un archivo individual
 
 Desde una terminal ubicada en el directorio correcto escribir: 
