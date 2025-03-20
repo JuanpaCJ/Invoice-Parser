@@ -1,0 +1,5 @@
+2025-03-20 11:22:35,119 - utils - INFO - Directorio creado: C:/Users/jcespedes/Documents/Análisis de datos/facturas\resultados
+2025-03-20 11:22:35,129 - utils - INFO - Directorio creado: C:/Users/jcespedes/Documents/Análisis de datos/facturas\resultados\csv
+2025-03-20 11:22:35,129 - main - INFO - Se encontraron 2 archivos PDF para procesar
+2025-03-20 11:22:35,129 - main - INFO - Iniciando procesamiento consolidado de facturas
+2025-03-20 11:22:36,492 - main - INFO - Se ha creado el archivo Excel consolidado: C:/Users/jcespedes/Documents/Análisis de datos/facturas\resultados\facturas_analizadas.xlsx

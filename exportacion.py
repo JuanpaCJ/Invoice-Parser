@@ -1,0 +1,581 @@
+"""
+Módulo para la exportación de datos procesados de facturas a formatos específicos.
+Este módulo contiene clases y funciones para exportar los datos procesados a 
+formatos como Excel, incluyendo estilos y metadatos.
+"""
+
+import uuid
+import os
+from datetime import datetime
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+
+class ExportadorExcel:
+    """
+    Clase para exportar datos de facturas a formato Excel.
+    Esta clase genera archivos Excel con múltiples hojas, estilos y metadatos.
+    """
+    
+    def __init__(self, datos_procesados, ruta_salida=None):
+        """
+        Inicializa el exportador con los datos procesados.
+        
+        Args:
+            datos_procesados (dict): Datos procesados de la factura
+            ruta_salida (str, optional): Ruta donde se guardará el archivo Excel.
+                                         Si es None, se usará 'factura_analizada.xlsx'.
+        """
+        self.datos_procesados = datos_procesados
+        self.ruta_salida = ruta_salida or "factura_analizada.xlsx"
+        self.invoice_id = str(uuid.uuid4())
+        self.workbook = Workbook()
+        
+        # Definir estilos
+        self.header_font = Font(bold=True, color="FFFFFF")
+        self.header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        self.border = Border(
+            left=Side(style='thin'), 
+            right=Side(style='thin'), 
+            top=Side(style='thin'), 
+            bottom=Side(style='thin')
+        )
+    
+    def exportar(self):
+        """
+        Exporta los datos procesados a un archivo Excel.
+        Crea las hojas de 'Facturas', 'Conceptos' y 'Metadatos'.
+        
+        Returns:
+            str: Ruta del archivo Excel creado
+        """
+        # Crear hoja de Facturas
+        self._crear_hoja_facturas()
+        
+        # Crear hoja de Conceptos
+        self._crear_hoja_conceptos()
+        
+        # Crear hoja de Metadatos
+        self._crear_hoja_metadatos()
+        
+        # Guardar archivo
+        self.workbook.save(self.ruta_salida)
+        return self.ruta_salida
+    
+    def _crear_hoja_facturas(self):
+        """
+        Crea la hoja 'Facturas' con los datos generales de la factura.
+        """
+        ws_facturas = self.workbook.active
+        ws_facturas.title = "Facturas"
+        
+        # Encabezados de la tabla de Facturas
+        encabezados_factura = [
+            "ID_Factura", "Fecha_Procesamiento", "Fecha_Vencimiento", "Periodo_Facturacion", 
+            "Factor_M", "Codigo_SIC", "Subtotal_Base_Energia", "Contribucion", 
+            "Contribucion_Otros_Meses", "Subtotal_Energia_Contribucion_KWh", 
+            "Subtotal_Energia_Contribucion_Pesos", "Otros_Cobros", "Sobretasa", 
+            "Ajustes_Cargos_Regulados", "Compensaciones", "Saldo_Cartera", 
+            "Interes_Mora", "Alumbrado_Publico", "Impuesto_Alumbrado_Publico", 
+            "Ajuste_IAP_Otros_Meses", "Convivencia_Ciudadana", "Tasa_Especial_Convivencia", 
+            "Ajuste_Tasa_Convivencia", "Total_Servicio_Energia_Impuestos", 
+            "Ajuste_Decena", "Neto_Pagar", "Energia_Reactiva_Inductiva", 
+            "Energia_Reactiva_Capacitiva", "Total_Energia_Reactiva"
+        ]
+        
+        # Aplicar encabezados y estilos
+        for col_idx, header in enumerate(encabezados_factura, 1):
+            cell = ws_facturas.cell(row=1, column=col_idx, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.border = self.border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Obtener datos generales
+        datos_generales = self.datos_procesados["datos_generales"]
+        
+        # Añadir datos de factura
+        factura_valores = [
+            self.invoice_id,
+            self.datos_procesados.get("fecha_procesamiento", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            datos_generales.get("fecha_vencimiento", "No encontrado"),
+            datos_generales.get("periodo_facturacion", "No encontrado"),
+            datos_generales.get("factor_m", "No encontrado"),
+            datos_generales.get("codigo_sic", "No encontrado"),
+            datos_generales.get("subtotal_base_energia", 0),
+            datos_generales.get("contribucion", 0),
+            datos_generales.get("contribucion_otros_meses", 0),
+            datos_generales.get("subtotal_energia_contribucion_kwh", 0),
+            datos_generales.get("subtotal_energia_contribucion_pesos", 0),
+            datos_generales.get("otros_cobros", 0),
+            datos_generales.get("sobretasa", 0),
+            datos_generales.get("ajustes_cargos_regulados", 0),
+            datos_generales.get("compensaciones", 0),
+            datos_generales.get("saldo_cartera", 0),
+            datos_generales.get("interes_mora", 0),
+            datos_generales.get("alumbrado_publico", 0),
+            datos_generales.get("impuesto_alumbrado_publico", 0),
+            datos_generales.get("ajuste_iap_otros_meses", 0),
+            datos_generales.get("convivencia_ciudadana", 0),
+            datos_generales.get("tasa_especial_convivencia", 0),
+            datos_generales.get("ajuste_tasa_convivencia", 0),
+            datos_generales.get("total_servicio_energia_impuestos", 0),
+            datos_generales.get("ajuste_decena", 0),
+            datos_generales.get("neto_pagar", 0),
+            datos_generales.get("energia_reactiva_inductiva", 0),
+            datos_generales.get("energia_reactiva_capacitiva", 0),
+            datos_generales.get("total_energia_reactiva", 0)
+        ]
+        
+        for col_idx, value in enumerate(factura_valores, 1):
+            cell = ws_facturas.cell(row=2, column=col_idx, value=value)
+            cell.border = self.border
+        
+        # Ajustar ancho de columnas
+        self._ajustar_ancho_columnas(ws_facturas)
+    
+    def _crear_hoja_conceptos(self):
+        """
+        Crea la hoja 'Conceptos' con los datos de los componentes de la factura.
+        """
+        ws_conceptos = self.workbook.create_sheet(title="Conceptos")
+        
+        # Encabezados de la tabla de Conceptos
+        headers_conceptos = ["ID_Factura", "Concepto", "KWh_KVArh", "Precio_KWh", "Mes_Corriente", "Mes_Anteriores", "Total"]
+        
+        for col_idx, header in enumerate(headers_conceptos, 1):
+            cell = ws_conceptos.cell(row=1, column=col_idx, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.border = self.border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Añadir datos de componentes
+        componentes = self.datos_procesados["componentes"]
+        
+        for row_idx, componente in enumerate(componentes, 2):
+            # Añadir ID de factura a cada componente
+            ws_conceptos.cell(row=row_idx, column=1, value=self.invoice_id).border = self.border
+            
+            # Datos del componente
+            ws_conceptos.cell(row=row_idx, column=2, value=componente.get("concepto", "")).border = self.border
+            ws_conceptos.cell(row=row_idx, column=3, value=componente.get("kwh_kvarh", "N/A")).border = self.border
+            ws_conceptos.cell(row=row_idx, column=4, value=componente.get("precio_kwh", 0)).border = self.border
+            ws_conceptos.cell(row=row_idx, column=5, value=componente.get("mes_corriente", 0)).border = self.border
+            ws_conceptos.cell(row=row_idx, column=6, value=componente.get("mes_anteriores", 0)).border = self.border
+            ws_conceptos.cell(row=row_idx, column=7, value=componente.get("total", 0)).border = self.border
+        
+        # Ajustar ancho de columnas
+        self._ajustar_ancho_columnas(ws_conceptos)
+    
+    def _crear_hoja_metadatos(self):
+        """
+        Crea la hoja 'Metadatos' con información descriptiva de los campos.
+        """
+        ws_metadata = self.workbook.create_sheet(title="Metadatos")
+        
+        metadata_headers = ["Campo", "Descripción", "Tipo de Dato", "Unidad", "Observaciones"]
+        
+        for col_idx, header in enumerate(metadata_headers, 1):
+            cell = ws_metadata.cell(row=1, column=col_idx, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.border = self.border
+        
+        # Añadir descripciones de metadatos para tabla Facturas
+        filas_metadatos = [
+            ["ID_Factura", "Identificador único de la factura", "UUID", "N/A", "Clave primaria"],
+            ["Fecha_Procesamiento", "Fecha y hora de procesamiento del archivo", "Datetime", "N/A", "Generado automáticamente"],
+            ["Fecha_Vencimiento", "Fecha límite de pago", "Date", "N/A", ""],
+            ["Periodo_Facturacion", "Período al que corresponde la factura", "String", "N/A", ""],
+            ["Factor_M", "Factor de multiplicación para mediciones", "Integer", "N/A", ""],
+            ["Codigo_SIC", "Código del Sistema de Información Comercial", "String", "N/A", ""],
+            ["Subtotal_Base_Energia", "Subtotal base de energía facturada", "Decimal", "Pesos", ""],
+            ["Contribucion", "Valor de la contribución", "Decimal", "Pesos", ""],
+            ["Contribucion_Otros_Meses", "Contribución correspondiente a meses anteriores", "Decimal", "Pesos", ""],
+            ["Subtotal_Energia_Contribucion_KWh", "Precio por kWh de energía y contribución", "Decimal", "$/kWh", ""],
+            ["Subtotal_Energia_Contribucion_Pesos", "Subtotal energía más contribución", "Decimal", "Pesos", ""],
+            ["Otros_Cobros", "Valor de otros cobros adicionales", "Decimal", "Pesos", ""],
+            ["Sobretasa", "Valor de la sobretasa aplicada", "Decimal", "Pesos", ""],
+            ["Ajustes_Cargos_Regulados", "Ajustes por cargos regulados", "Decimal", "Pesos", ""],
+            ["Compensaciones", "Valor de compensaciones aplicadas", "Decimal", "Pesos", ""],
+            ["Saldo_Cartera", "Saldo pendiente en cartera", "Decimal", "Pesos", ""],
+            ["Interes_Mora", "Interés por mora en pagos anteriores", "Decimal", "Pesos", ""],
+            ["Alumbrado_Publico", "Cargo por alumbrado público", "Decimal", "Pesos", ""],
+            ["Impuesto_Alumbrado_Publico", "Impuesto por alumbrado público", "Decimal", "Pesos", ""],
+            ["Ajuste_IAP_Otros_Meses", "Ajuste de impuesto de alumbrado público de otros meses", "Decimal", "Pesos", ""],
+            ["Convivencia_Ciudadana", "Cargo por convivencia ciudadana", "Decimal", "Pesos", ""],
+            ["Tasa_Especial_Convivencia", "Tasa especial de convivencia ciudadana", "Decimal", "Pesos", ""],
+            ["Ajuste_Tasa_Convivencia", "Ajuste de la tasa de convivencia de otros meses", "Decimal", "Pesos", ""],
+            ["Total_Servicio_Energia_Impuestos", "Total por servicio de energía e impuestos", "Decimal", "Pesos", ""],
+            ["Ajuste_Decena", "Ajuste a la decena", "Decimal", "Pesos", ""],
+            ["Neto_Pagar", "Valor neto a pagar", "Decimal", "Pesos", ""],
+            ["Energia_Reactiva_Inductiva", "Valor de energía reactiva inductiva", "Decimal", "kVArh", ""],
+            ["Energia_Reactiva_Capacitiva", "Valor de energía reactiva capacitiva", "Decimal", "kVArh", ""],
+            ["Total_Energia_Reactiva", "Total de energía reactiva", "Decimal", "kVArh", ""]
+        ]
+        
+        # Añadir metadatos para tabla Conceptos
+        conceptos_metadatos = [
+            ["ID_Factura", "Identificador único de la factura (clave foránea)", "UUID", "N/A", "Relaciona con tabla Facturas"],
+            ["Concepto", "Tipo de concepto facturado", "String", "N/A", "Ej. Generación, Comercialización"],
+            ["KWh_KVArh", "Cantidad de energía consumida", "Decimal", "kWh/kVArh", "Solo aplica para algunos conceptos"],
+            ["Precio_KWh", "Precio unitario por kWh", "Decimal", "$/kWh", ""],
+            ["Mes_Corriente", "Valor facturado del mes actual", "Decimal", "Pesos", ""],
+            ["Mes_Anteriores", "Valor facturado de meses anteriores", "Decimal", "Pesos", ""],
+            ["Total", "Valor total del concepto", "Decimal", "Pesos", ""]
+        ]
+        
+        # Combinar todos los metadatos
+        all_metadata = filas_metadatos + conceptos_metadatos
+        
+        for row_idx, metadata in enumerate(all_metadata, 2):
+            for col_idx, value in enumerate(metadata, 1):
+                cell = ws_metadata.cell(row=row_idx, column=col_idx, value=value)
+                cell.border = self.border
+        
+        # Ajustar ancho de columnas
+        self._ajustar_ancho_columnas(ws_metadata)
+    
+    def _ajustar_ancho_columnas(self, worksheet):
+        """
+        Ajusta el ancho de las columnas de una hoja de cálculo.
+        
+        Args:
+            worksheet: Hoja de cálculo a ajustar
+        """
+        for col in worksheet.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                if cell.value:
+                    max_length = max(max_length, len(str(cell.value)))
+            adjusted_width = (max_length + 2)
+            worksheet.column_dimensions[column].width = adjusted_width
+
+
+class ExportadorExcelMultiple:
+    """
+    Clase para exportar múltiples facturas a un único archivo Excel.
+    Permite consolidar datos de varias facturas en un solo archivo.
+    """
+    
+    def __init__(self, ruta_salida=None):
+        """
+        Inicializa el exportador múltiple.
+        
+        Args:
+            ruta_salida (str, optional): Ruta donde se guardará el archivo Excel.
+                                          Si es None, se usará 'facturas_analizadas.xlsx'.
+        """
+        self.ruta_salida = ruta_salida or "facturas_analizadas.xlsx"
+        self.workbook = Workbook()
+        
+        # Inicializar hojas
+        self.ws_facturas = self.workbook.active
+        self.ws_facturas.title = "Facturas"
+        self.ws_conceptos = self.workbook.create_sheet(title="Conceptos")
+        self.ws_metadata = self.workbook.create_sheet(title="Metadatos")
+        
+        # Definir estilos
+        self.header_font = Font(bold=True, color="FFFFFF")
+        self.header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        self.border = Border(
+            left=Side(style='thin'), 
+            right=Side(style='thin'), 
+            top=Side(style='thin'), 
+            bottom=Side(style='thin')
+        )
+        
+        # Contador de filas
+        self.fila_facturas = 1
+        self.fila_conceptos = 1
+        
+        # Crear cabeceras
+        self._crear_cabeceras()
+    
+    def _crear_cabeceras(self):
+        """
+        Crea las cabeceras de las hojas del Excel.
+        """
+        # Encabezados Facturas
+        encabezados_factura = [
+            "ID_Factura", "Nombre_Archivo", "Fecha_Procesamiento", "Fecha_Vencimiento", "Periodo_Facturacion", 
+            "Factor_M", "Codigo_SIC", "Subtotal_Base_Energia", "Contribucion", 
+            "Contribucion_Otros_Meses", "Subtotal_Energia_Contribucion_KWh", 
+            "Subtotal_Energia_Contribucion_Pesos", "Otros_Cobros", "Sobretasa", 
+            "Ajustes_Cargos_Regulados", "Compensaciones", "Saldo_Cartera", 
+            "Interes_Mora", "Alumbrado_Publico", "Impuesto_Alumbrado_Publico", 
+            "Ajuste_IAP_Otros_Meses", "Convivencia_Ciudadana", "Tasa_Especial_Convivencia", 
+            "Ajuste_Tasa_Convivencia", "Total_Servicio_Energia_Impuestos", 
+            "Ajuste_Decena", "Neto_Pagar", "Energia_Reactiva_Inductiva", 
+            "Energia_Reactiva_Capacitiva", "Total_Energia_Reactiva"
+        ]
+        
+        for col_idx, header in enumerate(encabezados_factura, 1):
+            cell = self.ws_facturas.cell(row=1, column=col_idx, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.border = self.border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Encabezados Conceptos
+        headers_conceptos = ["ID_Factura", "Concepto", "KWh_KVArh", "Precio_KWh", "Mes_Corriente", "Mes_Anteriores", "Total"]
+        
+        for col_idx, header in enumerate(headers_conceptos, 1):
+            cell = self.ws_conceptos.cell(row=1, column=col_idx, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.border = self.border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Actualizar contadores de filas
+        self.fila_facturas = 2
+        self.fila_conceptos = 2
+        
+        # Crear hoja de metadatos
+        self._crear_hoja_metadatos()
+    
+    def agregar_factura(self, datos_procesados, nombre_archivo=None):
+        """
+        Agrega una factura al archivo Excel.
+        
+        Args:
+            datos_procesados (dict): Datos procesados de la factura
+            nombre_archivo (str, optional): Nombre del archivo PDF original
+        """
+        invoice_id = str(uuid.uuid4())
+        
+        # Agregar datos a la hoja Facturas
+        datos_generales = datos_procesados["datos_generales"]
+        factura_valores = [
+            invoice_id,
+            nombre_archivo or "No especificado",
+            datos_procesados.get("fecha_procesamiento", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            datos_generales.get("fecha_vencimiento", "No encontrado"),
+            datos_generales.get("periodo_facturacion", "No encontrado"),
+            datos_generales.get("factor_m", "No encontrado"),
+            datos_generales.get("codigo_sic", "No encontrado"),
+            datos_generales.get("subtotal_base_energia", 0),
+            datos_generales.get("contribucion", 0),
+            datos_generales.get("contribucion_otros_meses", 0),
+            datos_generales.get("subtotal_energia_contribucion_kwh", 0),
+            datos_generales.get("subtotal_energia_contribucion_pesos", 0),
+            datos_generales.get("otros_cobros", 0),
+            datos_generales.get("sobretasa", 0),
+            datos_generales.get("ajustes_cargos_regulados", 0),
+            datos_generales.get("compensaciones", 0),
+            datos_generales.get("saldo_cartera", 0),
+            datos_generales.get("interes_mora", 0),
+            datos_generales.get("alumbrado_publico", 0),
+            datos_generales.get("impuesto_alumbrado_publico", 0),
+            datos_generales.get("ajuste_iap_otros_meses", 0),
+            datos_generales.get("convivencia_ciudadana", 0),
+            datos_generales.get("tasa_especial_convivencia", 0),
+            datos_generales.get("ajuste_tasa_convivencia", 0),
+            datos_generales.get("total_servicio_energia_impuestos", 0),
+            datos_generales.get("ajuste_decena", 0),
+            datos_generales.get("neto_pagar", 0),
+            datos_generales.get("energia_reactiva_inductiva", 0),
+            datos_generales.get("energia_reactiva_capacitiva", 0),
+            datos_generales.get("total_energia_reactiva", 0)
+        ]
+        
+        for col_idx, value in enumerate(factura_valores, 1):
+            cell = self.ws_facturas.cell(row=self.fila_facturas, column=col_idx, value=value)
+            cell.border = self.border
+        
+        # Agregar datos a la hoja Conceptos
+        componentes = datos_procesados["componentes"]
+        for componente in componentes:
+            # Añadir ID de factura a cada componente
+            self.ws_conceptos.cell(row=self.fila_conceptos, column=1, value=invoice_id).border = self.border
+            
+            # Datos del componente
+            self.ws_conceptos.cell(row=self.fila_conceptos, column=2, value=componente.get("concepto", "")).border = self.border
+            self.ws_conceptos.cell(row=self.fila_conceptos, column=3, value=componente.get("kwh_kvarh", "N/A")).border = self.border
+            self.ws_conceptos.cell(row=self.fila_conceptos, column=4, value=componente.get("precio_kwh", 0)).border = self.border
+            self.ws_conceptos.cell(row=self.fila_conceptos, column=5, value=componente.get("mes_corriente", 0)).border = self.border
+            self.ws_conceptos.cell(row=self.fila_conceptos, column=6, value=componente.get("mes_anteriores", 0)).border = self.border
+            self.ws_conceptos.cell(row=self.fila_conceptos, column=7, value=componente.get("total", 0)).border = self.border
+            
+            self.fila_conceptos += 1
+        
+        # Actualizar contador de filas de facturas
+        self.fila_facturas += 1
+        
+        return invoice_id
+    
+    def _crear_hoja_metadatos(self):
+        """
+        Crea la hoja de metadatos con información descriptiva de los campos.
+        """
+        metadata_headers = ["Campo", "Descripción", "Tipo de Dato", "Unidad", "Observaciones"]
+        
+        for col_idx, header in enumerate(metadata_headers, 1):
+            cell = self.ws_metadata.cell(row=1, column=col_idx, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.border = self.border
+        
+        # Añadir descripciones de metadatos para tabla Facturas
+        filas_metadatos = [
+            ["ID_Factura", "Identificador único de la factura", "UUID", "N/A", "Clave primaria"],
+            ["Fecha_Procesamiento", "Fecha y hora de procesamiento del archivo", "Datetime", "N/A", "Generado automáticamente"],
+            ["Fecha_Vencimiento", "Fecha límite de pago", "Date", "N/A", ""],
+            ["Periodo_Facturacion", "Período al que corresponde la factura", "String", "N/A", ""],
+            ["Factor_M", "Factor de multiplicación para mediciones", "Integer", "N/A", ""],
+            ["Codigo_SIC", "Código del Sistema de Información Comercial", "String", "N/A", ""],
+            ["Subtotal_Base_Energia", "Subtotal base de energía facturada", "Decimal", "Pesos", ""],
+            ["Contribucion", "Valor de la contribución", "Decimal", "Pesos", ""],
+            ["Contribucion_Otros_Meses", "Contribución correspondiente a meses anteriores", "Decimal", "Pesos", ""],
+            ["Subtotal_Energia_Contribucion_KWh", "Precio por kWh de energía y contribución", "Decimal", "$/kWh", ""],
+            ["Subtotal_Energia_Contribucion_Pesos", "Subtotal energía más contribución", "Decimal", "Pesos", ""],
+            ["Otros_Cobros", "Valor de otros cobros adicionales", "Decimal", "Pesos", ""],
+            ["Sobretasa", "Valor de la sobretasa aplicada", "Decimal", "Pesos", ""],
+            ["Ajustes_Cargos_Regulados", "Ajustes por cargos regulados", "Decimal", "Pesos", ""],
+            ["Compensaciones", "Valor de compensaciones aplicadas", "Decimal", "Pesos", ""],
+            ["Saldo_Cartera", "Saldo pendiente en cartera", "Decimal", "Pesos", ""],
+            ["Interes_Mora", "Interés por mora en pagos anteriores", "Decimal", "Pesos", ""],
+            ["Alumbrado_Publico", "Cargo por alumbrado público", "Decimal", "Pesos", ""],
+            ["Impuesto_Alumbrado_Publico", "Impuesto por alumbrado público", "Decimal", "Pesos", ""],
+            ["Ajuste_IAP_Otros_Meses", "Ajuste de impuesto de alumbrado público de otros meses", "Decimal", "Pesos", ""],
+            ["Convivencia_Ciudadana", "Cargo por convivencia ciudadana", "Decimal", "Pesos", ""],
+            ["Tasa_Especial_Convivencia", "Tasa especial de convivencia ciudadana", "Decimal", "Pesos", ""],
+            ["Ajuste_Tasa_Convivencia", "Ajuste de la tasa de convivencia de otros meses", "Decimal", "Pesos", ""],
+            ["Total_Servicio_Energia_Impuestos", "Total por servicio de energía e impuestos", "Decimal", "Pesos", ""],
+            ["Ajuste_Decena", "Ajuste a la decena", "Decimal", "Pesos", ""],
+            ["Neto_Pagar", "Valor neto a pagar", "Decimal", "Pesos", ""],
+            ["Energia_Reactiva_Inductiva", "Valor de energía reactiva inductiva", "Decimal", "kVArh", ""],
+            ["Energia_Reactiva_Capacitiva", "Valor de energía reactiva capacitiva", "Decimal", "kVArh", ""],
+            ["Total_Energia_Reactiva", "Total de energía reactiva", "Decimal", "kVArh", ""]
+        ]
+        
+        # Añadir metadatos para tabla Conceptos
+        conceptos_metadatos = [
+            ["ID_Factura", "Identificador único de la factura (clave foránea)", "UUID", "N/A", "Relaciona con tabla Facturas"],
+            ["Concepto", "Tipo de concepto facturado", "String", "N/A", "Ej. Generación, Comercialización"],
+            ["KWh_KVArh", "Cantidad de energía consumida", "Decimal", "kWh/kVArh", "Solo aplica para algunos conceptos"],
+            ["Precio_KWh", "Precio unitario por kWh", "Decimal", "$/kWh", ""],
+            ["Mes_Corriente", "Valor facturado del mes actual", "Decimal", "Pesos", ""],
+            ["Mes_Anteriores", "Valor facturado de meses anteriores", "Decimal", "Pesos", ""],
+            ["Total", "Valor total del concepto", "Decimal", "Pesos", ""]
+        ]
+        
+        # Combinar todos los metadatos
+        all_metadata = filas_metadatos + conceptos_metadatos
+        
+        for row_idx, metadata in enumerate(all_metadata, 2):
+            for col_idx, value in enumerate(metadata, 1):
+                cell = self.ws_metadata.cell(row=row_idx, column=col_idx, value=value)
+                cell.border = self.border
+    
+    def finalizar(self):
+        """
+        Finaliza el proceso de exportación y guarda el archivo Excel.
+        
+        Returns:
+            str: Ruta del archivo Excel creado
+        """
+        # Ajustar ancho de columnas
+        for worksheet in [self.ws_facturas, self.ws_conceptos, self.ws_metadata]:
+            self._ajustar_ancho_columnas(worksheet)
+        
+        # Guardar archivo
+        self.workbook.save(self.ruta_salida)
+        return self.ruta_salida
+    
+    def _ajustar_ancho_columnas(self, worksheet):
+        """
+        Ajusta el ancho de las columnas de una hoja de cálculo.
+        
+        Args:
+            worksheet: Hoja de cálculo a ajustar
+        """
+        for col in worksheet.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                if cell.value:
+                    max_length = max(max_length, len(str(cell.value)))
+            adjusted_width = (max_length + 2)
+            worksheet.column_dimensions[column].width = adjusted_width
+
+
+def procesar_multiples_facturas(directorio_entrada, ruta_salida=None, directorio_csv=None):
+    """
+    Procesa múltiples facturas en un directorio y las exporta a un solo archivo Excel.
+    
+    Args:
+        directorio_entrada (str): Directorio con los archivos PDF de facturas
+        ruta_salida (str, optional): Ruta donde se guardará el archivo Excel.
+                                     Si es None, se usará 'facturas_analizadas.xlsx'.
+        directorio_csv (str, optional): Directorio donde se guardarán los archivos CSV.
+                                        Si es None, se usará 'csv' dentro del directorio de salida.
+    
+    Returns:
+        str: Ruta del archivo Excel creado
+    """
+    import extractores
+    import procesamiento
+    
+    # Definir ruta de salida
+    if ruta_salida is None:
+        ruta_salida = os.path.join(os.path.dirname(directorio_entrada), "resultados")
+    
+    # Crear directorio de salida si no existe
+    if not os.path.exists(ruta_salida):
+        os.makedirs(ruta_salida)
+    
+    # Definir directorio para archivos CSV
+    if directorio_csv is None:
+        directorio_csv = os.path.join(ruta_salida, "csv")
+    
+    # Crear directorio para archivos CSV si no existe
+    if not os.path.exists(directorio_csv):
+        os.makedirs(directorio_csv)
+    
+    # Ruta del archivo Excel consolidado
+    ruta_excel = os.path.join(ruta_salida, "facturas_analizadas.xlsx")
+    
+    # Obtener lista de archivos PDF
+    archivos_pdf = [f for f in os.listdir(directorio_entrada) if f.lower().endswith('.pdf')]
+    
+    if not archivos_pdf:
+        print(f"No se encontraron archivos PDF en el directorio {directorio_entrada}")
+        return None
+    
+    # Crear exportador de Excel consolidado
+    exportador = ExportadorExcelMultiple(ruta_excel)
+    
+    # Procesar cada factura
+    for archivo in archivos_pdf:
+        ruta_pdf = os.path.join(directorio_entrada, archivo)
+        
+        # Validar archivo
+        if not procesamiento.validar_ruta_archivo(ruta_pdf):
+            print(f"Omitiendo archivo: {archivo}")
+            continue
+        
+        # Extraer nombre base
+        nombre_base = os.path.splitext(archivo)[0]
+        
+        # Convertir PDF a CSV (guardándolo en el directorio de CSV)
+        ruta_csv = os.path.join(directorio_csv, f"{nombre_base}.csv")
+        extractores.convertir_pdf_a_csv(ruta_pdf, ruta_csv)
+        
+        # Extraer datos del CSV
+        datos_generales, datos_componentes = extractores.extraer_todos_datos_factura(ruta_csv)
+        
+        # Procesar datos
+        processor = procesamiento.FacturaProcessor(datos_generales, datos_componentes)
+        datos_procesados = processor.obtener_datos_procesados()
+        
+        # Agregar a Excel consolidado incluyendo el nombre del archivo
+        exportador.agregar_factura(datos_procesados, archivo)
+    
+    # Finalizar y guardar Excel
+    ruta_final = exportador.finalizar()
+    print(f"Archivo Excel consolidado creado: {ruta_final}")
+    
+    return ruta_final
