@@ -2,3 +2,5 @@ pdfminer.six
 openpyxl
 pandas
 cx_Freeze
+customtkinter
+pillow

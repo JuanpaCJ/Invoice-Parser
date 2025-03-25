@@ -77,6 +77,18 @@ COMPONENTES_ENERGIA = [
     }
 ]
 
+# Nuevos patrones para extraer los parámetros específicos
+PATRONES_PARAMETROS_ESPECIFICOS = {
+    'ir': [r'IR:\s*(?:,|\s+)([^,\s]+)', r'IR:,([^,]+)'],
+    'grupo': [r'Grupo:\s*(?:,|\s+)(\d+)', r'Grupo:,(\d+)', r'Grupo: (\d+)'],
+    'diu_int': [r'DIU INT:\s*(?:,|\s+)([^,\s]+)', r'DIU INT:,([^,]+)'],
+    'dium_int': [r'DIUM INT:\s*(?:,|\s+)([^,\s]+)', r'DIUM INT:,([^,]+)'],
+    'fiu_int': [r'FIU INT:\s*(?:,|\s+)([^,\s]+)', r'FIU INT:,([^,]+)'],
+    'fium_int': [r'FIUM INT:\s*(?:,|\s+)([^,\s]+)', r'FIUM INT:,([^,]+)'],
+    'fiug': [r'FIUG:\s*(?:,|\s+)([\d.]+)', r'FIUG: ([\d.]+)'],
+    'diug': [r'DIUG:\s*(?:,|\s+)([\d.]+)', r'DIUG: ([\d.]+)']
+}
+
 
 def convertir_pdf_a_csv(ruta_pdf, ruta_salida=None):
     """
@@ -270,6 +282,97 @@ def leer_archivo(file_path):
     return content
 
 
+def extraer_valores_hes(content):
+    """
+    Extrae los valores HES del contenido, asegurando que solo se extraigan valores numéricos.
+    
+    Args:
+        content (str): Contenido del archivo CSV
+        
+    Returns:
+        dict: Diccionario con los valores HES extraídos (solo números)
+    """
+    # Inicializar diccionario con valores vacíos para todos los HES
+    results = {
+        'hes1': "0", 'hes2': "0", 'hes3': "0", 'hes4': "0", 'hes5': "0",
+        'hes6': "0", 'hes7': "0", 'hes8': "0", 'hes9': "0", 'hes10': "0"
+    }
+    
+    # Patrones para cada HES (1-10)
+    for i in range(1, 11):
+        # Crear varios patrones para cada HES
+        patrones = [
+            rf'HES{i}:[\t\s]*(\d+)',             # Formato básico: HES1: 12345
+            rf'HES{i}[\t\s]*:[\t\s]*(\d+)',      # Variante con espacios
+            rf'HES[\t\s,]+{i}[\t\s,]*:[\t\s]*(\d+)'  # Formato con separación: HES, 10, : 12345
+        ]
+        
+        # Intentar los patrones para este HES
+        for patron in patrones:
+            match = re.search(patron, content)
+            if match:
+                # Extraer solo el valor numérico
+                value = match.group(1).strip()
+                # Verificar que sea numérico
+                if value.isdigit():
+                    results[f'hes{i}'] = value
+                    break  # Si encontramos un valor numérico, podemos parar
+    
+    return results
+
+
+def extraer_parametros_especificos(content):
+    """
+    Extrae los parámetros específicos como IR, Grupo, DIU INT, etc.
+    
+    Args:
+        content (str): Contenido del archivo CSV
+        
+    Returns:
+        dict: Diccionario con los parámetros específicos extraídos
+    """
+    # Inicializar diccionario con valores por defecto (todos numéricos)
+    parametros = {
+        'ir': "0",
+        'grupo': "0",
+        'diu_int': "0",
+        'dium_int': "0",
+        'fiu_int': "0",
+        'fium_int': "0",
+        'fiug': "0",
+        'diug': "0"
+    }
+    
+    # Buscar los patrones completos primero para FIUG y DIUG que son los más confiables
+    patron_fiug_diug = r'FIUG:\s*([\d.]+),\s*DIUG:\s*([\d.]+)'
+    match = re.search(patron_fiug_diug, content)
+    if match:
+        parametros['fiug'] = match.group(1)
+        parametros['diug'] = match.group(2)
+    
+    # Buscar el grupo
+    patron_grupo = r'Grupo:\s*(\d+)'
+    match = re.search(patron_grupo, content)
+    if match:
+        parametros['grupo'] = match.group(1)
+    
+    # Buscar los valores INT que son numéricos - sólo buscar dígitos
+    for key in ['diu_int', 'dium_int', 'fiu_int', 'fium_int']:
+        for patron in PATRONES_PARAMETROS_ESPECIFICOS[key]:
+            match = re.search(patron, content)
+            if match and match.group(1).isdigit():
+                parametros[key] = match.group(1)
+                break
+    
+    # IR es un caso especial - debe ser un número
+    patron_ir_especifico = r'IR:\s*(\d+)'
+    match = re.search(patron_ir_especifico, content)
+    if match and match.group(1).isdigit():
+        parametros['ir'] = match.group(1)
+    
+    return parametros
+
+
 def extraer_datos_factura(file_path):
     """
     Extrae los datos generales de la factura desde un archivo CSV.
@@ -303,12 +406,27 @@ def extraer_datos_factura(file_path):
     else:
         codigo_sic = "No encontrado"
     
+    # Extraer número de factura
+    numero_factura_patrones = [
+        r'FACTURA\s+ELECTR[ÓO]NICA\s+DE\s+VENTA\s+SERVICIO\s+P[ÚU]BLICO:.*?No\.\s+([A-Za-z0-9]+)',
+        r'FACTURA\s+ELECTR[ÓO]NICA\s+DE\s+VENTA\s+SERVICIO\s+P[ÚU]BLICO:,No\.\s+([A-Za-z0-9]+)',
+        r'No\.\s+([A-Za-z0-9]+)'
+    ]
+    
+    numero_factura = "No encontrado"
+    for patron in numero_factura_patrones:
+        match = re.search(patron, content, re.IGNORECASE)
+        if match:
+            numero_factura = match.group(1)
+            break
+    
     # Initialize results dictionary with the main variables
     results = {
         "fecha_vencimiento": fecha_vencimiento,
         "periodo_facturacion": periodo_facturacion,
         "factor_m": factor_m,
         "codigo_sic": codigo_sic,
+        "numero_factura": numero_factura,
     }
     
     # Extract all the financial variables
@@ -325,6 +443,14 @@ def extraer_datos_factura(file_path):
                 value = captured_value
                 break
         results[var_name] = value
+    
+    # Extraer valores HES (autorizaciones)
+    hes_values = extraer_valores_hes(content)
+    results.update(hes_values)
+    
+    # Extraer parámetros específicos (IR, Grupo, DIU INT, etc.)
+    parametros_especificos = extraer_parametros_especificos(content)
+    results.update(parametros_especificos)
     
     return results
 

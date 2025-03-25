@@ -37,9 +37,16 @@ class FacturaProcessor:
         Limpia y transforma los datos generales de la factura.
         Realiza conversiones de tipo y limpieza de formatos.
         """
+        # Lista de campos que no deben ser procesados como valores numéricos
+        campos_no_numericos = ["fecha_vencimiento", "periodo_facturacion", "codigo_sic"]
+        
         # Limpiar y convertir valores numéricos
         for key, value in self.datos_generales.items():
-            if key not in ["fecha_vencimiento", "periodo_facturacion", "codigo_sic"]:
+            if key in campos_no_numericos:
+                # Mantener como string
+                continue
+            else:
+                # Convertir a valor numérico
                 self.datos_generales[key] = self._limpiar_valor(value)
     
     def _limpiar_datos_componentes(self):
@@ -118,6 +125,27 @@ class FacturaProcessor:
         
         return totales
     
+    def obtener_parametros_especificos(self):
+        """
+        Obtiene los parámetros específicos de la factura (IR, Grupo, DIU INT, etc.)
+        
+        Returns:
+            dict: Diccionario con los parámetros específicos
+        """
+        parametros = {}
+        
+        # Lista de parámetros específicos a extraer
+        campos_especificos = [
+            "ir", "grupo", "diu_int", "dium_int", 
+            "fiu_int", "fium_int", "fiug", "diug"
+        ]
+        
+        # Extraer cada parámetro de los datos generales
+        for campo in campos_especificos:
+            parametros[campo] = self.datos_generales.get(campo, 0)
+        
+        return parametros
+    
     def validar_factura(self):
         """
         Valida la consistencia de los datos de la factura.
@@ -171,6 +199,7 @@ class FacturaProcessor:
             "datos_generales": self.datos_generales,
             "componentes": self.datos_componentes,
             "totales_calculados": self.calcular_totales(),
+            "parametros_especificos": self.obtener_parametros_especificos(),
             "validacion": self.validar_factura(),
             "fecha_procesamiento": self.fecha_procesamiento
         }
