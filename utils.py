@@ -16,6 +16,7 @@ logging.basicConfig(
         logging.FileHandler("factura_processor.log"),
         logging.StreamHandler()
     ]
+    
 )
 
 logger = logging.getLogger(__name__)
