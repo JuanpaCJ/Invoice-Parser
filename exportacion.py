@@ -673,7 +673,7 @@ class ExportadorExcelMultiple:
             estado_cell.border = self.border
             
             # Aplicar formato según el estado
-            if getattr(row, 'Estado', '') == 'Diferencia':
+            if getattr(row, 'Estado', '') == 'Alerta':
                 estado_cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
                 estado_cell.font = Font(color="9C0006")
             elif getattr(row, 'Estado', '') == 'No encontrado en DB':

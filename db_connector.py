@@ -352,7 +352,7 @@ class DBConnector:
                 if abs(diferencia) <= 1:  # Tolerancia de 1 para redondeos
                     estado = 'OK'
                 else:
-                    estado = 'Diferencia'
+                    estado = 'Alerta'
                 
                 # Agregar a la lista de comparaciones
                 comparaciones.append({
@@ -406,7 +406,7 @@ class DBConnector:
                     if abs(diferencia) <= 1:  # Tolerancia de 1 para redondeos
                         estado = 'OK'
                     else:
-                        estado = 'Diferencia'
+                        estado = 'Alerta'
                     
                     # Agregar a la lista de comparaciones
                     comparaciones.append({
