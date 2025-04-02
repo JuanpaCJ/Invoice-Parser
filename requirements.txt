@@ -4,3 +4,6 @@ pandas
 cx_Freeze
 customtkinter
 pillow
+psycopg2-binary
+unidecode
+beautifulsoup4
