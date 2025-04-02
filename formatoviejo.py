@@ -125,7 +125,7 @@ for factura in os.listdir(ruta_facturas):
     # worksheet.append(fila)
         df=df._append(fila, ignore_index=True)
 
-conexion1 = psycopg2.connect(host='172.16.2.52' ,database="liquidacionxm", user="gecc_read", password="OSiiErZ229F#", port='5432')
+conexion1 = psycopg2.connect(host='' ,database="", user="", password="", port='')
 cursor1=conexion1.cursor()
 
 fechas=["'2024-10-01'","'2024-10-31'"]
