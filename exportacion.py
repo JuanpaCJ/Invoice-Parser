@@ -621,6 +621,67 @@ class ExportadorExcelMultiple:
         self.fila_facturas += 1
         
         return invoice_id
+    def agregar_hoja_comparacion(self, comparaciones_df):
+        """
+        Agrega una hoja de comparación con la base de datos.
+        
+        Args:
+            comparaciones_df (pandas.DataFrame): DataFrame con las comparaciones
+        """
+        if comparaciones_df.empty:
+            return
+        
+        # Crear hoja de comparaciones
+        ws_comparaciones = self.workbook.create_sheet(title="Comparación DB")
+        
+        # Encabezados de la tabla de Comparaciones
+        headers_comparaciones = ["ID_Factura", "Frontera", "Concepto", "Valor_Factura", 
+                                "Valor_Datalake", "Diferencia", "Estado"]
+        
+        for col_idx, header in enumerate(headers_comparaciones, 1):
+            cell = ws_comparaciones.cell(row=1, column=col_idx, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.border = self.border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Añadir datos de comparaciones
+        for row_idx, row in enumerate(comparaciones_df.itertuples(), 2):
+            ws_comparaciones.cell(row=row_idx, column=1, value=row.ID_Factura).border = self.border
+            ws_comparaciones.cell(row=row_idx, column=2, value=row.Frontera).border = self.border
+            ws_comparaciones.cell(row=row_idx, column=3, value=row.Concepto).border = self.border
+            ws_comparaciones.cell(row=row_idx, column=4, value=row.Valor_Factura).border = self.border
+            
+            # Valor de Datalake (puede ser None)
+            valor_db_cell = ws_comparaciones.cell(row=row_idx, column=5, value=row.Valor_Datalake)
+            valor_db_cell.border = self.border
+            
+            # Diferencia (puede ser None)
+            if hasattr(row, 'Diferencia') and row.Diferencia is not None:
+                diferencia_cell = ws_comparaciones.cell(row=row_idx, column=6, value=row.Diferencia)
+                diferencia_cell.border = self.border
+                
+                # Formato condicional para la diferencia
+                if abs(row.Diferencia) > 1:  # Tolerancia de 1 para diferencias por redondeo
+                    diferencia_cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+                    diferencia_cell.font = Font(color="9C0006")
+            else:
+                ws_comparaciones.cell(row=row_idx, column=6, value=None).border = self.border
+            
+            # Estado
+            estado_cell = ws_comparaciones.cell(row=row_idx, column=7, value=getattr(row, 'Estado', 'N/A'))
+            estado_cell.border = self.border
+            
+            # Aplicar formato según el estado
+            if getattr(row, 'Estado', '') == 'Diferencia':
+                estado_cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+                estado_cell.font = Font(color="9C0006")
+            elif getattr(row, 'Estado', '') == 'No encontrado en DB':
+                estado_cell.fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+                estado_cell.font = Font(color="9C6500")
+        
+        # Ajustar ancho de columnas
+        self._ajustar_ancho_columnas(ws_comparaciones)
     
     def _crear_hoja_metadatos(self):
         """
@@ -768,6 +829,8 @@ def procesar_multiples_facturas(directorio_entrada, ruta_salida=None, directorio
     """
     import extractores
     import procesamiento
+    from db_connector import DBConnector
+    import pandas as pd
     
     # Definir ruta de salida
     if ruta_salida is None:
@@ -798,6 +861,9 @@ def procesar_multiples_facturas(directorio_entrada, ruta_salida=None, directorio
     # Crear exportador de Excel consolidado
     exportador = ExportadorExcelMultiple(ruta_excel)
     
+    # Lista para guardar datos procesados para la comparación
+    facturas_procesadas = []
+    
     # Procesar cada factura
     for archivo in archivos_pdf:
         ruta_pdf = os.path.join(directorio_entrada, archivo)
@@ -822,7 +888,36 @@ def procesar_multiples_facturas(directorio_entrada, ruta_salida=None, directorio
         datos_procesados = processor.obtener_datos_procesados()
         
         # Agregar a Excel consolidado incluyendo el nombre del archivo
-        exportador.agregar_factura(datos_procesados, archivo)
+        factura_id = exportador.agregar_factura(datos_procesados, archivo)
+        
+        # Guardar el ID en los datos procesados para la comparación
+        datos_procesados['id'] = factura_id
+        facturas_procesadas.append(datos_procesados)
+    if facturas_procesadas:
+    # Imprimir información de diagnóstico
+        for factura in facturas_procesadas:
+            print(f"Procesada factura con código SIC: {factura['datos_generales'].get('codigo_sic')}")
+            print(f"Período de facturación: {factura['datos_generales'].get('periodo_facturacion')}")
+            print("----")
+    # Realizar comparación con la base de datos
+    try:
+        # Usar el conector de base de datos
+        db_connector = DBConnector()
+        
+        # Comparar con la base de datos usando fechas extraídas de las facturas
+        comparaciones_df = db_connector.compare_with_facturas(facturas_procesadas)
+        
+        # Agregar hoja de comparación si hay datos
+        if not comparaciones_df.empty:
+            exportador.agregar_hoja_comparacion(comparaciones_df)
+            print(f"Se agregó hoja de comparación con {len(comparaciones_df)} registros")
+        else:
+            print("No se encontraron datos para comparación con la base de datos")
+    
+    except Exception as e:
+        print(f"Error al comparar con la base de datos: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Finalizar y guardar Excel
     ruta_final = exportador.finalizar()
