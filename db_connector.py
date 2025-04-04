@@ -61,7 +61,7 @@ class DBConnector:
             # Consulta específica por período de facturación
             query = """
             SELECT frontera as frt, factura_dian as factura, v_consumo_energia_ajustado as subtotal_energía_total, 
-            q_activa as energía_activa, q_inductiva_pen as energía_reactiva_inductiva_facturada, 
+            q_activa as energía_activa, q_inductiva_pen as energía_reactiva_inductiva_facturada, q_reactiva_pen as total_energia_reactiva,
             q_capacitiva_pen as energía_reactiva_capacitiva_facturada, v_gm as generación_mes_corriente, 
             v_rm as restricciones_mes_corriente, v_cm as comercialización_mes_corriente, v_dm as distribución_mes_corriente, 
             v_om as otros_cargos_mes_corriente, v_ppond as pérdidas_mes_corriente, v_tpond as transmisión_mes_corriente, 
@@ -70,14 +70,14 @@ class DBConnector:
             v_cm_ajuste as comercialización_ajustes_anteriores, v_dm_ajuste as distribución_ajustes_anteriores, 
             v_om_ajuste as otros_cargos_ajustes_anteriores,  v_ppond_ajuste as pérdidas_ajustes_anteriores, 
             v_tpond_ajuste as transmisión_ajustes_anteriores, v_consumo_energia_ajuste as subtotal_energía_ajustes_anteriores, 
-            v_reactiva_pen_ajuste as energía_inductiva_capacitiva_facturada_ajustes_anteriores,  v_gm_ajustado as generación_total, 
+            v_reactiva_pen_ajuste as energía_inductiva_capacitiva_facturada_ajustes_anteriores,  v_gm_ajustado as generación_total, v_iap_ajuste + v_iapb as alumbrado_publico_total,
             v_rm_ajustado as restricciones_total, v_cm_ajustado as comercialización_total, v_dm_ajustado as distribución_total, 
-            v_om_ajustado as otros_cargos_total,  v_ppond_ajustado as pérdidas_total, v_tpond_ajustado as transmisión_total, 
+            v_om_ajustado as otros_cargos_total, v_otros_total as otros_cobros,  v_ppond_ajustado as pérdidas_total, v_tpond_ajustado as transmisión_total, 
             v_reactiva_pen_ajustado as energía_inductiva_capacitiva_facturada_total, v_contribucion as contribución, 
             v_compensacion as compensaciones, total_saldo_cartera as amortizacion, v_iapb as impuesto_alumbrado_público, 
             v_iap_ajuste as ajuste_iap_otros_meses, v_sgcv as tasa_especial_convivencia_ciudadana, v_asgcv as ajuste_tasa_convivencia_otros_meses, 
             v_neto_factura as neto_a_pagar, factor_m, v_aj_cargos_regulados as ajustes_cargos_regulados, 
-            interes_mora as interés_por_mora  
+            interes_mora as interés_por_mora, v_neto_factura as total_servicio_energía_impuestos, v_asgcv + v_sgcv as covivencia_ciudadana  
             FROM app_ectc_gecc.reporte_liquidacion_frts 
             WHERE fechafacturacion BETWEEN to_date(%s, 'YYYY-MM-DD') AND to_date(%s, 'YYYY-MM-DD')
             """
@@ -115,7 +115,7 @@ class DBConnector:
                 # Consulta por frontera sin restricción de fecha
                 frontier_query = """
                 SELECT frontera as frt, factura_dian as factura, v_consumo_energia_ajustado as subtotal_energía_total, 
-                q_activa as energía_activa, q_inductiva_pen as energía_reactiva_inductiva_facturada, 
+                q_activa as energía_activa, q_inductiva_pen as energía_reactiva_inductiva_facturada, q_reactiva_pen as total_energia_reactiva,
                 q_capacitiva_pen as energía_reactiva_capacitiva_facturada, v_gm as generación_mes_corriente, 
                 v_rm as restricciones_mes_corriente, v_cm as comercialización_mes_corriente, v_dm as distribución_mes_corriente, 
                 v_om as otros_cargos_mes_corriente, v_ppond as pérdidas_mes_corriente, v_tpond as transmisión_mes_corriente, 
@@ -128,11 +128,12 @@ class DBConnector:
                 v_rm_ajustado as restricciones_total, v_cm_ajustado as comercialización_total, v_dm_ajustado as distribución_total, 
                 v_om_ajustado as otros_cargos_total,  v_ppond_ajustado as pérdidas_total, v_tpond_ajustado as transmisión_total, 
                 v_reactiva_pen_ajustado as energía_inductiva_capacitiva_facturada_total, v_contribucion as contribución, 
-                v_compensacion as compensaciones, total_saldo_cartera as amortizacion, v_iapb as impuesto_alumbrado_público, 
+                v_compensacion as compensaciones, total_saldo_cartera as amortizacion, v_iapb as impuesto_alumbrado_público, v_iap_ajuste + v_iapb as alumbrado_publico_total,
                 v_iap_ajuste as ajuste_iap_otros_meses, v_sgcv as tasa_especial_convivencia_ciudadana, v_asgcv as ajuste_tasa_convivencia_otros_meses, 
                 v_neto_factura as neto_a_pagar, factor_m, v_aj_cargos_regulados as ajustes_cargos_regulados, 
-                interes_mora as interés_por_mora,
-                fechafacturacion  
+                interes_mora as interés_por_mora,v_asgcv + v_sgcv as covivencia_ciudadana,
+                fechafacturacion, v_neto_factura as total_servicio_energía_impuestos
+
                 FROM app_ectc_gecc.reporte_liquidacion_frts 
                 WHERE frontera IN ({})
                 ORDER BY fechafacturacion DESC
@@ -225,6 +226,19 @@ class DBConnector:
         if db_data is None or db_data.empty:
             logger.warning("No se obtuvieron datos de la base de datos para comparar")
             
+            # Lista de campos a comparar (todos los campos solicitados)
+            campos_a_comparar = [
+                'periodo_facturacion', 'factor_m', 'codigo_sic', 'subtotal_base_energia', 
+                'contribucion', 'contribucion_otros_meses', 'subtotal_energia_contribucion_kwh', 
+                'subtotal_energia_contribucion_pesos', 'otros_cobros', 'sobretasa', 
+                'ajustes_cargos_regulados', 'compensaciones', 'saldo_cartera', 
+                'interes_mora', 'alumbrado_publico', 'impuesto_alumbrado_publico', 
+                'ajuste_iap_otros_meses', 'convivencia_ciudadana', 'tasa_especial_convivencia', 
+                'ajuste_tasa_convivencia', 'total_servicio_energia_impuestos', 
+                'ajuste_decena', 'neto_pagar', 'energia_reactiva_inductiva', 
+                'energia_reactiva_capacitiva', 'total_energia_reactiva'
+            ]
+            
             # Crear un DataFrame de comparación con datos de la factura y valores nulos para DB
             comparaciones = []
             for factura in facturas_procesadas:
@@ -233,14 +247,13 @@ class DBConnector:
                     continue
                     
                 # Agregar datos generales con valor nulo para DB
-                for var_factura in ['subtotal_base_energia', 'contribucion', 'neto_pagar', 
-                                'energia_reactiva_inductiva', 'energia_reactiva_capacitiva']:
-                    valor_factura = factura['datos_generales'].get(var_factura, 0)
+                for campo in campos_a_comparar:
+                    var_factura = factura['datos_generales'].get(campo.lower(), 0)
                     comparaciones.append({
                         'ID_Factura': factura.get('id', ''),
                         'Frontera': codigo_sic,
-                        'Concepto': var_factura,
-                        'Valor_Factura': valor_factura,
+                        'Concepto': campo,
+                        'Valor_Factura': var_factura,
                         'Valor_Datalake': None,
                         'Diferencia': None,
                         'Estado': 'No encontrado en DB'
@@ -268,15 +281,32 @@ class DBConnector:
         
         # Mapeo de nombres de variables para comparar
         mapeo_variables = {
+            'periodo_facturacion': 'período facturación',
+            'factor_m': 'factor_m',
+            'codigo_sic': 'frt',
             'subtotal_base_energia': 'subtotal_energía_total',
             'contribucion': 'contribución',
+            'contribucion_otros_meses': 'contribución_otros_meses',
+            'subtotal_energia_contribucion_kwh': 'subtotal_energía_contribución_kwh',
+            'subtotal_energia_contribucion_pesos': 'subtotal_energía_contribución_pesos',
+            'otros_cobros': 'otros_cobros',
+            'sobretasa': 'sobretasa',
+            'ajustes_cargos_regulados': 'ajustes_cargos_regulados',
+            'compensaciones': 'compensaciones',
+            'saldo_cartera': 'amortizacion',
+            'interes_mora': 'interés_por_mora',
+            'alumbrado_publico': 'alumbrado_publico_total',
+            'impuesto_alumbrado_publico': 'impuesto_alumbrado_público',
+            'ajuste_iap_otros_meses': 'ajuste_iap_otros_meses',
+            'convivencia_ciudadana': 'covivencia_ciudadana',
+            'tasa_especial_convivencia': 'tasa_especial_convivencia_ciudadana',
+            'ajuste_tasa_convivencia': 'ajuste_tasa_convivencia_otros_meses',
+            'total_servicio_energia_impuestos': 'total_servicio_energía_impuestos',
+            'ajuste_decena': 'ajuste_decena',
             'neto_pagar': 'neto_a_pagar',
             'energia_reactiva_inductiva': 'energía_reactiva_inductiva_facturada',
             'energia_reactiva_capacitiva': 'energía_reactiva_capacitiva_facturada',
-            'compensaciones': 'compensaciones',
-            'factor_m': 'factor_m',
-            'ajustes_cargos_regulados': 'ajustes_cargos_regulados',
-            'interes_mora': 'interés_por_mora'
+            'total_energia_reactiva': 'total_energia_reactiva'
         }
         
         # Para cada factura procesada, buscar correspondencia en la base de datos
@@ -292,7 +322,7 @@ class DBConnector:
                 logger.warning(f"No se encontraron datos en BD para la frontera {codigo_sic}")
                 
                 # Agregar filas con datos de la factura pero sin datos de BD
-                for var_factura in mapeo_variables:
+                for var_factura, var_db in mapeo_variables.items():
                     valor_factura = factura['datos_generales'].get(var_factura, 0)
                     comparaciones.append({
                         'ID_Factura': factura.get('id', ''),
@@ -325,7 +355,7 @@ class DBConnector:
                 logger.info(f"Se encontraron {len(factura_db)} registros para la frontera {codigo_sic}. Usando el primero.")
                 factura_db = factura_db.iloc[[0]]
                 
-            # Comparar variables generales
+            # Comparar todas las variables generales
             for var_factura, var_db in mapeo_variables.items():
                 valor_factura = factura['datos_generales'].get(var_factura, 0)
                 
