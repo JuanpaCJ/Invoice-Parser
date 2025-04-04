@@ -77,7 +77,7 @@ class DBConnector:
             v_compensacion as compensaciones, total_saldo_cartera as amortizacion, v_iapb as impuesto_alumbrado_público, 
             v_iap_ajuste as ajuste_iap_otros_meses, v_sgcv as tasa_especial_convivencia_ciudadana, v_asgcv as ajuste_tasa_convivencia_otros_meses, 
             v_neto_factura as neto_a_pagar, factor_m, v_aj_cargos_regulados as ajustes_cargos_regulados, 
-            interes_mora as interés_por_mora, v_neto_factura as total_servicio_energía_impuestos
+            interes_mora as interés_por_mora, v_neto_factura as total_servicio_energía_impuestos,v_asgcv + v_sgcv as covivencia_ciudadana
             FROM app_ectc_gecc.reporte_liquidacion_frts 
             WHERE fechafacturacion BETWEEN to_date(%s, 'YYYY-MM-DD') AND to_date(%s, 'YYYY-MM-DD')
             """
