@@ -372,7 +372,6 @@ def extraer_parametros_especificos(content):
     
     return parametros
 
-
 def extraer_datos_factura(file_path):
     """
     Extrae los datos generales de la factura desde un archivo CSV.
@@ -431,6 +430,10 @@ def extraer_datos_factura(file_path):
     
     # Extract all the financial variables
     for var_name, patterns in PATRONES_CONCEPTO.items():
+        # Omitimos subtotal_energia_contribucion_pesos ya que lo calcularemos después
+        if var_name == "subtotal_energia_contribucion_pesos":
+            continue
+        
         value = "No encontrado"
         for pattern in patterns:
             match = re.search(pattern, content)
@@ -444,6 +447,21 @@ def extraer_datos_factura(file_path):
                 break
         results[var_name] = value
     
+    # Calcular subtotal_energia_contribucion_pesos como la suma de subtotal_base_energia y contribucion
+    try:
+        # Convertir valores a números, eliminando las comas
+        subtotal_base = int(results["subtotal_base_energia"].replace(',', '')) if results["subtotal_base_energia"] != "No encontrado" else 0
+        contribucion = int(results["contribucion"].replace(',', '')) if results["contribucion"] != "No encontrado" else 0
+        
+        # Calcular la suma
+        subtotal_energia_contribucion_pesos = subtotal_base + contribucion
+        
+        # Formatear el resultado con comas para miles
+        results["subtotal_energia_contribucion_pesos"] = f"{subtotal_energia_contribucion_pesos:,}"
+    except (ValueError, KeyError):
+        # En caso de error, establecer un valor por defecto
+        results["subtotal_energia_contribucion_pesos"] = "No encontrado"
+    
     # Extraer valores HES (autorizaciones)
     hes_values = extraer_valores_hes(content)
     results.update(hes_values)
@@ -453,7 +471,6 @@ def extraer_datos_factura(file_path):
     results.update(parametros_especificos)
     
     return results
-
 
 def extraer_tabla_componentes(file_path):
     """
